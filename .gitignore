@@ -1,0 +1,15 @@
+# Created by .ignore support plugin (hsz.mobi)
+
+**/logs/*
+*.iml
+.idea
+logs
+target
+.idea/libraries
+src/main/webapp/doc
+src/main/webapp/apiDoc
+tmp/
+~$*
+*.log
+output/
+gen/
