@@ -7,6 +7,7 @@ import com.quantchi.sqlinject.mysql.MysqlInject;
 import org.springframework.util.StringUtils;
 
 import java.util.Collection;
+import java.util.Optional;
 
 public class SqlParseInjector implements SqlInjector {
 
@@ -28,7 +29,7 @@ public class SqlParseInjector implements SqlInjector {
 
     public SqlParseInjector(SpringELHandler springELHandler, String table, String field, boolean not, SqlParseInject.MODE mode, String[] filters) {
         this.springELHandler = springELHandler;
-        this.table = table;
+        this.table = StringUtils.isEmpty(table)?null:table;
         this.field = field;
         this.not = not;
         this.mode = mode;
@@ -46,7 +47,7 @@ public class SqlParseInjector implements SqlInjector {
         this.values = new String[0];
     }
 
-    private String evalFilter() {
+    String evalFilter() {
         if (this.filter != null) {
             return this.filter;
         }
@@ -59,8 +60,13 @@ public class SqlParseInjector implements SqlInjector {
                 if (values.length > 1) {
                     throw new IllegalStateException("EQUAL模式不支持多个参数");
                 }
-                filterBuilder.append(wrapField()).append(not?" !":" ").append("= ");
+                filterBuilder.append(wrapField());
                 Object value1 = springELHandler.handle(values[0]);
+                if ("null".equalsIgnoreCase(Optional.ofNullable(value1).map(Object::toString).map(String::trim).orElse(""))) {
+                    filterBuilder.append(not?" IS NOT NULL ": " IS NULL");
+                    break;
+                }
+                filterBuilder.append(not?" !":" ").append("= ");
                 filterBuilder.append(checkAndWrapValue(value1));
                 break;
             case LIKE:
@@ -158,5 +164,13 @@ public class SqlParseInjector implements SqlInjector {
 
     public String inject(String sql) {
         return parseSql(sql);
+    }
+
+    public String getTable() {
+        return table;
+    }
+
+    public String getField() {
+        return field;
     }
 }

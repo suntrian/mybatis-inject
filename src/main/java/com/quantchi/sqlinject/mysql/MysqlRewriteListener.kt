@@ -1,112 +1,160 @@
 package com.quantchi.sqlinject.mysql
 
+import com.quantchi.sqlinject.annotation.Logic
 import com.quantchi.sqlinject.mysql.parser.MySqlParser.*
 import com.quantchi.sqlinject.mysql.parser.MySqlParserBaseListener
 import org.antlr.v4.runtime.TokenStreamRewriter
+import kotlin.collections.HashMap
 
-class MysqlRewriteListener(private val rewriter: TokenStreamRewriter, targetTable: String?, private val filter: String) : MySqlParserBaseListener() {
+class MysqlRewriteListener(private val rewriter: TokenStreamRewriter,
+                           private val logic: Logic,
+                           tableFilters: Map<String?, List<String>>
+) : MySqlParserBaseListener() {
 
-    private val targetTable: String? = targetTable?.toLowerCase()
+    private val tableFilters: MutableMap<String?, List<String>>
 
-    private var level = 0;
+    private val targetTable: Set<String?> = tableFilters.keys.filterNotNull().map { it.toLowerCase() }.toSet()
+
+    private val hasNullTable = tableFilters.keys.any { it == null || "" == it }
+
+    private var level = 0
+
+    init {
+        this.tableFilters = HashMap()
+        tableFilters.forEach { (k, v) -> this.tableFilters.put(if (k==null||k=="") null else k.toLowerCase(), v) }
+    }
 
     override fun enterTableSources(ctx: TableSourcesContext) { level ++ }
     override fun exitTableSources(ctx: TableSourcesContext) { level -- }
 
     override fun exitFromClause(ctx: FromClauseContext) {
-        var tempFilter = getFilters(ctx.tableSources())
-        if (tempFilter.isNotEmpty()) {
+        var filters = getFilters(ctx.tableSources())
+        if (filters.isNotEmpty()) {
             if (ctx.WHERE() == null) {
-                rewriter.insertAfter(ctx.tableSources().stop, tempFilter.joinToString(separator = " AND ", prefix = " WHERE "))
+                rewriter.insertAfter(ctx.tableSources().stop, " WHERE ${mergeFilters(filters)}")
             } else {
-                rewriter.insertAfter(ctx.WHERE().symbol, tempFilter.joinToString(" AND ", " ( ", " ) AND ") )
+                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND " )
             }
         }
     }
 
     override fun exitSingleUpdateStatement(ctx: SingleUpdateStatementContext) {
-        val tempFilter = this.filter.replace("/**PREFIX**/", "")
-        if (this.targetTable != null) {
-            val tableName = ctx.uid()?.text?:unwrapTableName(ctx.tableName().text)
-            if (this.targetTable != tableName.toLowerCase()) {
-                return
+        val tableName = unwrapTableName(ctx.tableName().text)
+        val tableAlias = ctx.uid()?.text
+        val filters: List<String> = getFilters(tableName, tableAlias)
+        if (filters.isNotEmpty()) {
+            if (ctx.WHERE() == null) {
+                rewriter.insertAfter(ctx.updatedElement().last().stop, " WHERE ${mergeFilters(filters)}")
+            } else {
+                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND ")
             }
-        } else if (level > 1) {
-            return
-        }
-        if (ctx.WHERE() == null) {
-            rewriter.insertAfter(ctx.updatedElement().last().stop, " WHERE $tempFilter ")
-        } else {
-            rewriter.insertAfter(ctx.WHERE().symbol, " ($tempFilter) AND ")
         }
     }
 
     override fun exitMultipleUpdateStatement(ctx: MultipleUpdateStatementContext) {
-        var tempFilter = getFilters(ctx.tableSources())
-        if (tempFilter.isNotEmpty()) {
+        var filters = getFilters(ctx.tableSources())
+        if (filters.isNotEmpty()) {
             if (ctx.WHERE() == null) {
-                rewriter.insertAfter(ctx.updatedElement().last().stop, tempFilter.joinToString(separator = " AND ", prefix = " WHERE "))
+                rewriter.insertAfter(ctx.updatedElement().last().stop, " WHERE ${mergeFilters(filters)}")
             } else {
-                rewriter.insertAfter(ctx.WHERE().symbol, tempFilter.joinToString(" AND ", " ( ", " ) AND "))
+                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND ")
             }
         }
     }
 
     override fun exitSingleDeleteStatement(ctx: SingleDeleteStatementContext) {
-        val tempFilter = this.filter.replace("/**PREFIX**/", "")
-        if (this.targetTable != null) {
-            val tableName = unwrapTableName(ctx.tableName().text)
-            if (this.targetTable != tableName.toLowerCase()) {
-                return
-            }
-        } else if (level > 1) {
-            return
-        }
-        if (ctx.WHERE() == null) {
-            if (ctx.PARTITION()!=null) {
-                rewriter.insertAfter(ctx.RR_BRACKET().symbol, " WHERE $tempFilter ")
+        val tableName = unwrapTableName(ctx.tableName().text)
+        val filters = getFilters(tableName, null)
+        if (filters.isNotEmpty()) {
+            if (ctx.WHERE() == null) {
+                if (ctx.PARTITION() != null) {
+                    rewriter.insertAfter(ctx.RR_BRACKET().symbol, " WHERE ${mergeFilters(filters)}")
+                } else {
+                    rewriter.insertAfter(ctx.tableName().stop, " WHERE ${mergeFilters(filters)}")
+                }
             } else {
-                rewriter.insertAfter(ctx.tableName().stop, " WHERE $tempFilter ")
+                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND ")
             }
-        } else {
-            rewriter.insertAfter(ctx.WHERE().symbol, " ($filter) AND ")
         }
     }
 
     override fun exitMultipleDeleteStatement(ctx: MultipleDeleteStatementContext) {
-        var tempFilter = getFilters(ctx.tableSources())
-        if (tempFilter.isNotEmpty()) {
+        var filters = getFilters(ctx.tableSources())
+        if (filters.isNotEmpty()) {
             if (ctx.WHERE() == null) {
-                rewriter.insertAfter(ctx.tableSources().stop, tempFilter.joinToString(separator = " AND ", prefix = " WHERE "))
+                rewriter.insertAfter(ctx.tableSources().stop, " WHERE ${mergeFilters(filters)}")
             } else {
-                rewriter.insertAfter(ctx.WHERE().symbol, tempFilter.joinToString(" AND ", " ( ", " ) AND "))
+                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND ")
             }
         }
     }
 
+    private fun mergeFilters(filters: List<String>) : String {
+        return if (filters.size==1) filters[0] else filters.joinToString(separator = " ${logic.name} ", prefix = " ( ", postfix = " ) ")
+    }
+
     private fun getFilters(ctx: TableSourcesContext): List<String> {
-        var tempFilter: MutableList<String> = mutableListOf(this.filter)
-        if (targetTable != null) {
+        var tempFilter: MutableList<String> = mutableListOf()
+        if (targetTable.isNotEmpty()) {
             val tables = tableSources(ctx)
-            val matchTables = tables.filter { targetTable == it.first?.toLowerCase() || targetTable == it.second?.toLowerCase() }
-            if (tables.isEmpty()) {
-                return emptyList()
-            } else {
-                tempFilter = mutableListOf();
-                for (matchTable in matchTables) {
-                    val prefix: String? = matchTable.second?:matchTable.first
-                    if (prefix != null) {
-                        tempFilter.add(this.filter.replace("/**PREFIX**/", "$prefix."))
-                    } else {
-                        tempFilter.add(this.filter)
+            val matchTables = tables.filter { targetTable.contains(it.first?.toLowerCase()) || targetTable.contains(it.second?.toLowerCase()) }
+            if (matchTables.isNotEmpty()) {
+                for (tableFilter in this.tableFilters) {
+                    if (tableFilter.key == null) continue
+                    for (filter in tableFilter.value) {
+                        val matchTableFilters = mutableListOf<String>()
+                        for (matchTable in matchTables) {
+                            if (tableFilter.key == matchTable.second?.toLowerCase() || tableFilter.key == matchTable.first?.toLowerCase()) {
+                                val prefix: String? = matchTable.second?:matchTable.first
+                                matchTableFilters.add(filter.replace("/**PREFIX**/", "$prefix."))
+                            }
+                        }
+                        if (matchTableFilters.isNotEmpty()) {
+                            tempFilter.add( if (matchTableFilters.size==1) matchTableFilters[0] else matchTableFilters.joinToString(" AND ", prefix = "(", postfix = ")"))
+                        }
                     }
                 }
             }
-        } else if (level > 0) {
-            //判断是否根查询,未指定表名时，只在根查询上加过滤条件
-            return emptyList()
         }
-        return tempFilter;
+        if (hasNullTable && level == 0) {
+            //判断是否根查询,未指定表名时，只在根查询上加过滤条件
+            val filters = this.tableFilters[null] ?:this.tableFilters[""]?: emptyList()
+            if (filters.isEmpty()) {
+                return emptyList()
+            }
+            tempFilter.addAll(filters.map{ it.replace("/**PREFIX**/", "") })
+        }
+        return tempFilter
+    }
+
+    private fun getFilters(tableName: String, tableAlias: String?) : List<String> {
+        val tempFilters: MutableList<String> = mutableListOf()
+        if (targetTable.isNotEmpty()) {
+            if (targetTable.any{it == tableName || it == tableAlias}) {
+                //当一个tabled存在多个查询时，如select * from table1 a join table1 b ON a.x = b.y, 将同一个table的filter进行AND连接
+                val prefix: String? = tableAlias?:tableName
+                val filters = tableFilters[tableName.toLowerCase()]?:tableFilters[tableAlias?.toLowerCase()]?: emptyList()
+                for (filter in filters) {
+
+
+                    if (prefix != null) {
+                        tempFilters.add(if (filters.size==1) filters[0].replace("/**PREFIX**/", "$prefix.")
+                        else filters.joinToString(" AND ", prefix=" ( ", postfix = " ) "){ it.replace("/**PREFIX**/", "$prefix.") })
+                    } else {
+                        tempFilters.add(if (filters.size==1) filters[0].replace("/**PREFIX**/", "$prefix.")
+                        else filters.joinToString(" AND ", prefix = " ( ", postfix = " ) "){ it.replace("/**PREFIX**/", "") })
+                    }
+                }
+            }
+        }
+        if (hasNullTable && level == 0) {
+            //判断是否根查询,未指定表名时，只在根查询上加过滤条件
+            val filters = this.tableFilters[null] ?:this.tableFilters[""]?: emptyList()
+            if (filters.isNotEmpty()) {
+                tempFilters.addAll(filters.map{ it.replace("/**PREFIX**/", "") })
+            }
+        }
+        return tempFilters
     }
 
     protected fun tableSources(ctx: TableSourcesContext): Set<Pair<String?, String?>> {

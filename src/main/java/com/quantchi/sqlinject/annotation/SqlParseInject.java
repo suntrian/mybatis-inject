@@ -11,9 +11,9 @@ public @interface SqlParseInject {
 
     MODE mode() default MODE.CUSTOM;
 
-    String table();
+    String table() default "";
 
-    String field();
+    String field() default "";
 
     String[] filter();
 

@@ -56,10 +56,12 @@ public class MybatisSqlInjectWithPageHelperAutoConfiguration {
         });
         springELHandler.setPostHandler(()-> {
             Page<?> page = tempPage.get();
-            if (page.getOrderBy() != null) {
-                PageHelper.startPage(page.getPageNum(), page.getPageSize(), page.getOrderBy());
-            } else {
-                PageHelper.startPage(page.getPageNum(), page.getPageSize(), page.isCount(), page.getReasonable(), page.getPageSizeZero() );
+            if (page != null) {
+                if (page.getOrderBy() != null) {
+                    PageHelper.startPage(page.getPageNum(), page.getPageSize(), page.getOrderBy());
+                } else {
+                    PageHelper.startPage(page.getPageNum(), page.getPageSize(), page.isCount(), page.getReasonable(), page.getPageSizeZero() );
+                }
             }
             tempPage.remove();
         });

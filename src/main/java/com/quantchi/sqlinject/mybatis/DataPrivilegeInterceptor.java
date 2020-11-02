@@ -1,17 +1,10 @@
 package com.quantchi.sqlinject.mybatis;
 
-import com.quantchi.sqlinject.annotation.FailoverStrategy;
-import com.quantchi.sqlinject.annotation.PlaceholderInject;
-import com.quantchi.sqlinject.annotation.SqlInject;
-import com.quantchi.sqlinject.annotation.SqlParseInject;
-import com.quantchi.sqlinject.injector.PlaceholderInjector;
-import com.quantchi.sqlinject.injector.SpringELHandler;
-import com.quantchi.sqlinject.injector.SqlInjector;
-import com.quantchi.sqlinject.injector.SqlParseInjector;
+import com.quantchi.sqlinject.annotation.*;
+import com.quantchi.sqlinject.injector.*;
 import org.apache.ibatis.executor.statement.StatementHandler;
 import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.MappedStatement;
-import org.apache.ibatis.mapping.SqlCommandType;
 import org.apache.ibatis.plugin.*;
 import org.apache.ibatis.reflection.MetaObject;
 import org.apache.ibatis.reflection.SystemMetaObject;
@@ -23,6 +16,8 @@ import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 
 @Intercepts(
@@ -36,7 +31,7 @@ public class DataPrivilegeInterceptor implements Interceptor {
 
     private String pageHelperCountSuffix = "_COUNT";
 
-    private static final Map<String, List<SqlInjector>> needInjectMap = new ConcurrentHashMap<String, List<SqlInjector>>();
+    private static final Map<String, List<SqlInjector>> needInjectMap = new ConcurrentHashMap();
 
     private final SpringELHandler springELHandler;
 
@@ -64,22 +59,40 @@ public class DataPrivilegeInterceptor implements Interceptor {
             }
             for (Method method : Class.forName(className).getMethods()) {
                 if (methodName.equals(method.getName())) {
+                    List<SqlInjector> injectors = new ArrayList<>(5);
+
                     PlaceholderInject placeholderInject = method.getAnnotation(PlaceholderInject.class);
-                    List<SqlInjector> injectors = new ArrayList<>(3);
                     if (placeholderInject != null) {
                         SqlInjector placeholderInjector = new PlaceholderInjector(this.springELHandler, placeholderInject.placeholder(), placeholderInject.replacement());
                         injectors.add(placeholderInjector);
                     }
+
+                    PlaceholderInjectGroup placeholderInjectGroup = method.getAnnotation(PlaceholderInjectGroup.class);
+                    if (placeholderInjectGroup != null) {
+                        PlaceHolderInjectorGroup placeHolderInjectorGroup = new PlaceHolderInjectorGroup(
+                                Stream.of(placeholderInjectGroup.value()).map(x-> new PlaceholderInjector(this.springELHandler, x.placeholder(), x.replacement())).collect(Collectors.toList()));
+                        injectors.add(placeHolderInjectorGroup);
+                    }
+
                     SqlParseInject sqlParseInject = method.getAnnotation(SqlParseInject.class);
                     if (sqlParseInject != null) {
                         SqlInjector sqlParseInjector = new SqlParseInjector(this.springELHandler, sqlParseInject.table(), sqlParseInject.field(), sqlParseInject.not(), sqlParseInject.mode(), sqlParseInject.filter());
                         injectors.add(sqlParseInjector);
                     }
+
+                    SqlParseInjectGroup sqlParseInjectGroup = method.getAnnotation(SqlParseInjectGroup.class);
+                    if (sqlParseInjectGroup != null) {
+                        SqlParseInjectorGroup sqlParseInjectorGroup = new SqlParseInjectorGroup(sqlParseInjectGroup.logic(),
+                                Stream.of(sqlParseInjectGroup.value()).map(x->new SqlParseInjector(this.springELHandler, x.table(), x.field(), x.not(), x.mode(), x.filter())).collect(Collectors.toList()));
+                        injectors.add(sqlParseInjectorGroup);
+                    }
+
                     SqlInject sqlInject = method.getAnnotation(SqlInject.class);
                     if (sqlInject != null) {
                         SqlInjector sqlParseInjector = new SqlParseInjector(sqlInject.filter());
                         injectors.add(sqlParseInjector);
                     }
+
                     needInjectMap.put(namespace, injectors);
                 }
             }
