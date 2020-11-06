@@ -6,7 +6,7 @@ import com.quantchi.sqlinject.injector.SpringELHandler;
 import com.quantchi.sqlinject.mybatis.DataPrivilegeInterceptor;
 import org.apache.ibatis.plugin.Interceptor;
 import org.apache.ibatis.session.SqlSessionFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.support.AbstractBeanFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -19,6 +19,9 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 import org.springframework.util.StringUtils;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
 @Configuration
 @ConditionalOnBean(SqlSessionFactory.class)
 @ConditionalOnClass(PageHelper.class)
@@ -27,6 +30,8 @@ import org.springframework.util.StringUtils;
 public class MybatisSqlInjectWithPageHelperAutoConfiguration {
 
     private static final ThreadLocal<Page<?>> tempPage = new ThreadLocal<>();
+
+    private Method setLocalPageMethod;
 
     @Bean
     @Primary
@@ -56,12 +61,25 @@ public class MybatisSqlInjectWithPageHelperAutoConfiguration {
         });
         springELHandler.setPostHandler(()-> {
             Page<?> page = tempPage.get();
-            if (page != null) {
-                if (page.getOrderBy() != null) {
-                    PageHelper.startPage(page.getPageNum(), page.getPageSize(), page.getOrderBy());
+            if (setLocalPageMethod == null) {
+                setLocalPageMethod = BeanUtils.findMethod(PageHelper.class, "setLocalPage", Page.class);
+                if (setLocalPageMethod == null ) {
+                    if (page != null) {
+                        if (page.getOrderBy() != null) {
+                            PageHelper.startPage(page.getPageNum(), page.getPageSize(), page.getOrderBy());
+                        } else {
+                            PageHelper.startPage(page.getPageNum(), page.getPageSize(), page.isCount(), page.getReasonable(), page.getPageSizeZero() );
+                        }
+                    }
+                    return;
                 } else {
-                    PageHelper.startPage(page.getPageNum(), page.getPageSize(), page.isCount(), page.getReasonable(), page.getPageSizeZero() );
+                    setLocalPageMethod.setAccessible(true);
                 }
+            }
+            try {
+                setLocalPageMethod.invoke(null, page);
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                e.printStackTrace();
             }
             tempPage.remove();
         });
