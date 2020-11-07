@@ -1,5 +1,6 @@
 package com.quantchi.sqlinject.mybatis;
 
+import com.quantchi.sqlinject.SqlInjectConf;
 import com.quantchi.sqlinject.annotation.*;
 import com.quantchi.sqlinject.injector.*;
 import org.apache.ibatis.executor.statement.StatementHandler;
@@ -31,7 +32,7 @@ public class DataPrivilegeInterceptor implements Interceptor {
 
     private String pageHelperCountSuffix = "_COUNT";
 
-    private static final Map<String, List<SqlInjector>> needInjectMap = new ConcurrentHashMap();
+    private static final Map<String, List<SqlInjector>> needInjectMap = new ConcurrentHashMap<>();
 
     private final SpringELHandler springELHandler;
 
@@ -44,6 +45,12 @@ public class DataPrivilegeInterceptor implements Interceptor {
         if (Proxy.isProxyClass(invocation.getTarget().getClass())) {
             return invocation.proceed();
         }
+        if (!SqlInjectConf.isEnabled()) {
+            SqlInjectConf.clear();
+            return invocation.proceed();
+        }
+        SqlInjectConf.clear();
+
         final StatementHandler statementHandler = (StatementHandler) invocation.getTarget();
         final MetaObject metaObject = SystemMetaObject.forObject(statementHandler);
         final MappedStatement mappedStatement = (MappedStatement) metaObject.getValue("delegate.mappedStatement");
