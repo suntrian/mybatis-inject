@@ -2,7 +2,6 @@ package com.quantchi.sqlinject.injector;
 
 import com.quantchi.sqlinject.annotation.FailoverStrategy;
 import com.quantchi.sqlinject.exception.EmptyValueException;
-import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanExpressionContext;
 import org.springframework.beans.factory.config.BeanExpressionResolver;
 import org.springframework.beans.factory.config.Scope;
@@ -14,6 +13,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class SpringELHandler {
 
@@ -38,7 +38,12 @@ public class SpringELHandler {
            return completeExpression(matcher.group(1));
         }
         while (matcher.find()){
-            expression = matcher.replaceFirst(String.valueOf(matcher.group(1)));
+            Object value = completeExpression(matcher.group(1));
+            if (value instanceof CharSequence) {
+                expression = matcher.replaceFirst(value.toString());
+            } else if (value instanceof Collection) {
+                expression = matcher.replaceFirst(((Collection<?>) value).stream().map(String::valueOf).collect(Collectors.joining(",")));
+            }
         }
         return expression;
     }
