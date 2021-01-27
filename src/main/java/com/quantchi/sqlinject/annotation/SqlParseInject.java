@@ -17,4 +17,6 @@ public @interface SqlParseInject {
 
     String[] filter();
 
+    Dialect dialect() default Dialect.MYSQL;
+
 }

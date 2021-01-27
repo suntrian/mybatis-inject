@@ -1,26 +1,21 @@
-package com.quantchi.sqlinject.mysql;
+package com.quantchi.sqlinject.parser.mysql;
 
 import com.quantchi.sqlinject.annotation.Logic;
-import com.quantchi.sqlinject.mysql.parser.CaseChangingCharStream;
-import com.quantchi.sqlinject.mysql.parser.MySqlLexer;
-import com.quantchi.sqlinject.mysql.parser.MySqlParser;
+import com.quantchi.sqlinject.parser.common.CaseChangingCharStream;
+import com.quantchi.sqlinject.parser.common.SqlRewriter;
+import com.quantchi.sqlinject.parser.mysql.parser.MySqlLexer;
+import com.quantchi.sqlinject.parser.mysql.parser.MySqlParser;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.Nullable;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-public class MysqlInject {
+public class MysqlInject implements SqlRewriter {
 
     private static final Logger log = LoggerFactory.getLogger(MysqlInject.class);
-
-    public String injectFilter(String sql, @Nullable String targetTable, String filter) {
-        return injectFilters(sql, Logic.AND, Collections.singletonMap(targetTable, Collections.singletonList(filter)));
-    }
 
     public String injectFilters(String sql, Logic logic, Map<String, List<String>> tableFilters) {
         CharStream charStream = new CaseChangingCharStream(CharStreams.fromString(sql), true);

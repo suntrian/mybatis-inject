@@ -1,6 +1,7 @@
 package com.quantchi.sqlinject.spring;
 
 
+import com.quantchi.sqlinject.annotation.Dialect;
 import com.quantchi.sqlinject.annotation.FailoverStrategy;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -13,6 +14,8 @@ public class SqlInjectProperties {
 
     //过滤条件的值为空或者null或者""之类的值时认为是错误
     private Boolean emptyValueAsFail = true;
+
+    private Dialect dialect = Dialect.MYSQL;
 
     public void setFailoverStrategy(FailoverStrategy failoverStrategy) {
         this.failoverStrategy = failoverStrategy;
@@ -29,4 +32,21 @@ public class SqlInjectProperties {
     public Boolean getEmptyValueAsFail() {
         return emptyValueAsFail;
     }
+
+    public Boolean getEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(Boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public Dialect getDialect() {
+        return dialect;
+    }
+
+    public void setDialect(Dialect dialect) {
+        this.dialect = dialect;
+    }
+
 }

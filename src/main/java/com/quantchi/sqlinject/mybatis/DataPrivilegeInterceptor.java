@@ -34,7 +34,7 @@ public class DataPrivilegeInterceptor implements Interceptor {
 
     private static final Map<String, List<SqlInjector>> needInjectMap = new ConcurrentHashMap<>();
 
-    private static final SqlParseInjector REJECT_INJECTOR = new SqlParseInjector(" 1 = 2 ");
+    private static final Map<Dialect, SqlParseInjector> REJECT_INJECTOR = new ConcurrentHashMap<>();
 
     private final SpringELHandler springELHandler;
 
@@ -102,7 +102,7 @@ public class DataPrivilegeInterceptor implements Interceptor {
                     if (FailoverStrategy.THROW == failoverStrategy) {
                         throw e;
                     } else if (FailoverStrategy.REJECT == failoverStrategy) {
-                        sql = REJECT_INJECTOR.inject(sql);
+                        sql = getRejectSqlInjector(guessDialect(sqlInjectors)).inject(sql);
                         break;
                     }
                 }
@@ -131,6 +131,28 @@ public class DataPrivilegeInterceptor implements Interceptor {
         this.pageHelperCountSuffix = pageHelperCountSuffix;
     }
 
+    private Dialect guessDialect(List<SqlInjector> sqlInjectors) {
+        return sqlInjectors.stream()
+                .map(x-> (x instanceof SpringELValueInjector)? ((SpringELValueInjector) x).getSqlInjector(): x)
+                .filter(x->(x instanceof SqlParseInjector))
+                .map(x->((SqlParseInjector) x).getDialect())
+                .findFirst()
+                .orElse(springELHandler.getSqlInjectProperties().getDialect());
+    }
+
+    private SqlParseInjector getRejectSqlInjector(Dialect dialect) {
+        SqlParseInjector result;
+        if ((result = REJECT_INJECTOR.get(dialect)) == null) {
+            synchronized (REJECT_INJECTOR) {
+                if ( (result = REJECT_INJECTOR.get(dialect)) == null) {
+                    result = new SqlParseInjector(" 1 = 2 ", dialect);
+                    REJECT_INJECTOR.put(dialect, result);
+                }
+            }
+        }
+        return result;
+    }
+
     private List<SqlInjector> extractSqlInjectors(String className, String methodName) throws ClassNotFoundException {
         for (Method method : Class.forName(className).getMethods()) {
             if (methodName.equals(method.getName())) {
@@ -145,14 +167,15 @@ public class DataPrivilegeInterceptor implements Interceptor {
 
                 SqlParseInject sqlParseInject = method.getAnnotation(SqlParseInject.class);
                 if (sqlParseInject != null) {
-                    SqlParseInjector sqlParseInjector = new SqlParseInjector(sqlParseInject.table(), sqlParseInject.field(), sqlParseInject.not(), sqlParseInject.mode(), sqlParseInject.filter());
+                    SqlParseInjector sqlParseInjector =
+                            new SqlParseInjector(sqlParseInject.table(), sqlParseInject.field(), sqlParseInject.not(), sqlParseInject.mode(), sqlParseInject.filter(), sqlParseInject.dialect());
                     SpringELValueInjector springELValueInjector = new SpringELValueInjector(this.springELHandler, sqlParseInjector);
                     injectors.add(springELValueInjector);
                 }
 
                 SqlInject sqlInject = method.getAnnotation(SqlInject.class);
                 if (sqlInject != null) {
-                    SqlInjector sqlParseInjector = new SqlParseInjector(sqlInject.filter());
+                    SqlInjector sqlParseInjector = new SqlParseInjector(sqlInject.filter(), sqlInject.dialect());
                     injectors.add(sqlParseInjector);
                 }
 
@@ -161,10 +184,13 @@ public class DataPrivilegeInterceptor implements Interceptor {
                     Logic logic = sqlInjectGroup.logic();
                     List<SqlInjector> sqlParseInjectors = Stream.concat(Stream.of(sqlInjectGroup.value()), Stream.of(sqlInjectGroup.parseInject()))
                             .map(it->{
-                                SqlParseInjector sqlParseInjector = new SqlParseInjector(it.table(), it.field(), it.not(), it.mode(), it.filter());
+                                SqlParseInjector sqlParseInjector = new SqlParseInjector(it.table(), it.field(), it.not(), it.mode(), it.filter(), it.dialect());
                                 return new SpringELValueInjector(this.springELHandler, sqlParseInjector);
                             })
                             .collect(Collectors.toList());
+                    if (sqlParseInjectors.size()>1 && sqlParseInjectors.stream().map(it->((SqlParseInjector)it).getDialect()).distinct().count()>1) {
+                        throw new IllegalStateException("同一注解中不可使用多个SQL方言");
+                    }
                     List<SqlInjector> placeholderInjectors = Stream.of(sqlInjectGroup.placeholderInject())
                             .map(it-> {
                                 PlaceholderInjector placeholderInjector = new PlaceholderInjector(it.placeholder(), it.replacement());

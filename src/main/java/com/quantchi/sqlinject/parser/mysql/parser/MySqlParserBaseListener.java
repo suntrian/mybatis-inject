@@ -1,5 +1,5 @@
 // Generated from D:/quantchi/mybatisInject/src/main/java/com/quantchi/sqlinject/mysql/parser\MySqlParser.g4 by ANTLR 4.8
-package com.quantchi.sqlinject.mysql.parser;
+package com.quantchi.sqlinject.parser.mysql.parser;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;

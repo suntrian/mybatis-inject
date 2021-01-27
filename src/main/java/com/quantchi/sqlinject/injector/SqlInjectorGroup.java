@@ -1,7 +1,8 @@
 package com.quantchi.sqlinject.injector;
 
 import com.quantchi.sqlinject.annotation.Logic;
-import com.quantchi.sqlinject.mysql.MysqlInject;
+import com.quantchi.sqlinject.parser._Dialect;
+import com.quantchi.sqlinject.parser.common.SqlRewriter;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -16,7 +17,7 @@ public class SqlInjectorGroup implements SqlInjector {
 
     private final List<SqlInjector> placeholderInjectors;
 
-    private final MysqlInject inject = new MysqlInject();
+    private final SqlRewriter inject = _Dialect.MYSQL.getSqlRewriter();
 
     public SqlInjectorGroup(Logic logic, List<SqlInjector> sqlParseInjectors, List<SqlInjector> placeholderInjectors) {
         this.logic = logic;

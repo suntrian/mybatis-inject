@@ -1,10 +1,9 @@
-package com.quantchi.sqlinject.mysql
+package com.quantchi.sqlinject.parser.mysql
 
 import com.quantchi.sqlinject.annotation.Logic
-import com.quantchi.sqlinject.mysql.parser.MySqlParser.*
-import com.quantchi.sqlinject.mysql.parser.MySqlParserBaseListener
+import com.quantchi.sqlinject.parser.mysql.parser.MySqlParser.*
+import com.quantchi.sqlinject.parser.mysql.parser.MySqlParserBaseListener
 import org.antlr.v4.runtime.TokenStreamRewriter
-import kotlin.collections.HashMap
 
 class MysqlRewriteListener(private val rewriter: TokenStreamRewriter,
                            private val logic: Logic,
@@ -135,8 +134,6 @@ class MysqlRewriteListener(private val rewriter: TokenStreamRewriter,
                 val prefix: String? = tableAlias?:tableName
                 val filters = tableFilters[tableName.toLowerCase()]?:tableFilters[tableAlias?.toLowerCase()]?: emptyList()
                 for (filter in filters) {
-
-
                     if (prefix != null) {
                         tempFilters.add(if (filters.size==1) filters[0].replace("/**PREFIX**/", "$prefix.")
                         else filters.joinToString(" AND ", prefix=" ( ", postfix = " ) "){ it.replace("/**PREFIX**/", "$prefix.") })
@@ -157,7 +154,10 @@ class MysqlRewriteListener(private val rewriter: TokenStreamRewriter,
         return tempFilters
     }
 
-    protected fun tableSources(ctx: TableSourcesContext): Set<Pair<String?, String?>> {
+    /**
+     * @return Set<Pair<tableName, tableAlias>>
+     */
+    private fun tableSources(ctx: TableSourcesContext): Set<Pair<String?, String?>> {
         val tables = mutableSetOf<Pair<String?, String?>>()
         for (tableSourceContext in ctx.tableSource()) {
             tables.addAll(tableSource(tableSourceContext))
@@ -165,7 +165,10 @@ class MysqlRewriteListener(private val rewriter: TokenStreamRewriter,
         return tables
     }
 
-    protected fun tableSource(ctx: TableSourceContext?): Set<Pair<String?, String?>> {
+    /**
+     * @return Set<Pair<tableName, tableAlias>>
+     */
+    private fun tableSource(ctx: TableSourceContext?): Set<Pair<String?, String?>> {
         val tableSourceItem: TableSourceItemContext
         val joinPart: List<JoinPartContext>?
         when (ctx) {
@@ -191,7 +194,10 @@ class MysqlRewriteListener(private val rewriter: TokenStreamRewriter,
         return tableSet
     }
 
-    protected fun tableSourceItem(ctx: TableSourceItemContext?): Set<Pair<String?, String?>> {
+    /**
+     * @return Set<Pair<tableName, tableAlias>>
+     */
+    private fun tableSourceItem(ctx: TableSourceItemContext?): Set<Pair<String?, String?>> {
         return when(ctx) {
             is AtomTableItemContext -> setOf(Pair(unwrapTableName(ctx.tableName().text), ctx.alias?.text))
             is SubqueryTableItemContext -> if (ctx.alias == null) emptySet() else setOf(Pair(null, ctx.alias.text))
@@ -206,7 +212,7 @@ class MysqlRewriteListener(private val rewriter: TokenStreamRewriter,
         }
     }
 
-    protected fun unwrapTableName(tableName: String): String {
+    private fun unwrapTableName(tableName: String): String {
         return tableName.split(".").last()
                 .trim('`')
     }

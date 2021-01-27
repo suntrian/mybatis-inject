@@ -1,4 +1,4 @@
-package com.quantchi.sqlinject.mysql.parser;
+package com.quantchi.sqlinject.parser.common;
 
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.misc.Interval;

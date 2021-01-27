@@ -26,6 +26,13 @@
       "sourceType": "com.quantchi.sqlinject.spring.SqlInjectProperties",
       "description": "注入失败时的处理策略",
       "defaultValue": "throw"
+    },
+    {
+      "name": "mybatis.inject.dialect",
+      "type": "com.quantchi.sqlinject.annotation.Dialect",
+      "sourceType": "com.quantchi.sqlinject.spring.SqlInjectProperties",
+      "description": "SQL解析使用的数据库方言",
+      "defaultValue": "mysql"
     }
   ],
   "hints": []

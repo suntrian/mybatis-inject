@@ -1,7 +1,7 @@
 package com.quantchi.sqlinject.injector;
 
+import com.quantchi.sqlinject.annotation.Dialect;
 import com.quantchi.sqlinject.annotation.FilterMode;
-import com.quantchi.sqlinject.mysql.MysqlInject;
 import org.springframework.util.StringUtils;
 
 import java.util.Collection;
@@ -22,24 +22,30 @@ public class SqlParseInjector implements ValueSqlInjector {
 
     private final Object[] values;
 
-    private final MysqlInject inject = new MysqlInject();
+    private final Dialect dialect;
 
-    public SqlParseInjector(String table, String field, boolean not, FilterMode mode, String[] filters) {
+    public SqlParseInjector(String table, String field, boolean not, FilterMode mode, String[] filters, Dialect dialect) {
         this.table = StringUtils.isEmpty(table)?null:table;
         this.field = field;
         this.not = not;
         this.mode = mode;
         this.values = filters == null? new Object[0]: Stream.of(filters).toArray();
         this.filter = null;
+        this.dialect = dialect;
     }
 
-    public SqlParseInjector(String filter) {
+    public SqlParseInjector(String table, String field, boolean not, FilterMode mode, String[] filters) {
+        this(table, field, not, mode, filters, Dialect.MYSQL);
+    }
+
+    public SqlParseInjector(String filter, Dialect dialect) {
         this.filter = filter == null? "": filter;
         this.table = null;
         this.field = null;
         this.not = false;
         this.mode = FilterMode.CUSTOM;
         this.values = new String[0];
+        this.dialect = dialect;
     }
 
     String evalFilter() {
@@ -139,7 +145,7 @@ public class SqlParseInjector implements ValueSqlInjector {
         if (StringUtils.isEmpty(filter)) {
             return sql;
         }
-        return inject.injectFilter(sql, table, filter);
+        return dialect.getSqlRewriter().injectFilter(sql, table, filter);
     }
 
     @Override
@@ -153,6 +159,10 @@ public class SqlParseInjector implements ValueSqlInjector {
 
     public String getField() {
         return field;
+    }
+
+    public Dialect getDialect() {
+        return dialect;
     }
 
     @Override
