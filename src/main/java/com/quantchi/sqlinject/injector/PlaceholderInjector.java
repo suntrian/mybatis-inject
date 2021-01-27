@@ -2,27 +2,27 @@ package com.quantchi.sqlinject.injector;
 
 import java.util.regex.Pattern;
 
-public class PlaceholderInjector implements SqlInjector {
+public class PlaceholderInjector implements ValueSqlInjector {
 
-    private final String placeholder;
     private final Pattern placeholderPattern;
 
     private final String replacement;
 
-    private final SpringELHandler springELHandler;
-
-    public PlaceholderInjector(SpringELHandler springELHandler, String placeholder, String replacement) {
-        this.springELHandler = springELHandler;
-        this.placeholder = placeholder;
+    public PlaceholderInjector(String placeholder, String replacement) {
         this.placeholderPattern = Pattern.compile(placeholder, Pattern.LITERAL);
         this.replacement = replacement;
     }
 
     public String inject(String sql) {
-        Object evalReplacement = springELHandler.handle(replacement);
+        Object evalReplacement = values()[0];
         if (evalReplacement instanceof String) {
             return placeholderPattern.matcher(sql).replaceAll((String) evalReplacement);
         }
-        return sql.replaceAll(placeholder, replacement);
+        return placeholderPattern.matcher(sql).replaceAll(replacement);
+    }
+
+    @Override
+    public Object[] values() {
+        return new Object[]{ this.replacement };
     }
 }

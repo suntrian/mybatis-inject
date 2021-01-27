@@ -2,6 +2,8 @@ package com.quantchi.sqlinject.injector;
 
 import com.quantchi.sqlinject.annotation.FailoverStrategy;
 import com.quantchi.sqlinject.exception.EmptyValueException;
+import com.quantchi.sqlinject.exception.ValueEvalException;
+import com.quantchi.sqlinject.spring.SqlInjectProperties;
 import org.springframework.beans.factory.config.BeanExpressionContext;
 import org.springframework.beans.factory.config.BeanExpressionResolver;
 import org.springframework.beans.factory.config.Scope;
@@ -19,15 +21,15 @@ public class SpringELHandler {
 
     private final BeanExpressionResolver beanExpressionResolver;
     private final BeanExpressionContext beanExpressionContext;
+    private final SqlInjectProperties sqlInjectProperties;
 
-    private Boolean emptyValueAsFail = true;
-    private FailoverStrategy failoverStrategy = FailoverStrategy.IGNORE;
     private Runnable preHandler = null;
     private Runnable postHandler = null;
 
-    public SpringELHandler(@NonNull AbstractBeanFactory beanFactory, Scope scope) {
+    public SpringELHandler(@NonNull AbstractBeanFactory beanFactory, Scope scope, SqlInjectProperties sqlInjectProperties) {
         this.beanExpressionResolver = beanFactory.getBeanExpressionResolver();
         this.beanExpressionContext = new BeanExpressionContext(beanFactory, scope == null?new SimpleThreadScope(): scope);
+        this.sqlInjectProperties = sqlInjectProperties;
     }
 
     private static final Pattern SPEL_PATTERN = Pattern.compile("(#\\{.*?\\})", Pattern.DOTALL);
@@ -54,29 +56,15 @@ public class SpringELHandler {
                 this.preHandler.run();
             }
             Object evaluate = this.beanExpressionResolver.evaluate(expression, this.beanExpressionContext);
-            if (evaluate == null ) {
-                if (emptyValueAsFail) {
-                    throw new EmptyValueException(evaluate);
-                }
-            } else if (evaluate instanceof Collection<?>) {
-                if (((Collection<?>) evaluate).isEmpty() && emptyValueAsFail) {
-                    throw new EmptyValueException(evaluate);
-                }
-            } else if (evaluate instanceof Map) {
-                if (((Map<?, ?>) evaluate).isEmpty() && emptyValueAsFail) {
-                    throw new EmptyValueException(evaluate);
-                }
-            } else if (evaluate instanceof CharSequence) {
-                if ("".equals(evaluate) && emptyValueAsFail) {
-                    throw new EmptyValueException(evaluate);
-                }
+            if (sqlInjectProperties.getEmptyValueAsFail() && isEmptyValue(evaluate)) {
+                throw new EmptyValueException(evaluate);
             }
             return evaluate;
         } catch (Exception e) {
-            if (FailoverStrategy.IGNORE.equals(failoverStrategy)){
+            if (FailoverStrategy.IGNORE.equals(sqlInjectProperties.getFailoverStrategy())){
                 return null;
             }
-            throw e;
+            throw new ValueEvalException(e);
         } finally {
             if (this.postHandler != null) {
                 this.postHandler.run();
@@ -97,19 +85,16 @@ public class SpringELHandler {
         this.postHandler = postHandler;
     }
 
-    public void setFailoverStrategy(FailoverStrategy failoverStrategy) {
-        this.failoverStrategy = failoverStrategy;
+    public SqlInjectProperties getSqlInjectProperties() {
+        return sqlInjectProperties;
     }
 
-    public void setEmptyValueAsFail(Boolean emptyValueAsFail) {
-        this.emptyValueAsFail = emptyValueAsFail;
+    private boolean isEmptyValue(Object value) {
+        if (value == null ) return true;
+        if (value instanceof CharSequence && ((CharSequence) value).length()==0) return true;
+        if (value instanceof Collection && ((Collection<?>) value).isEmpty()) return true;
+        if (value instanceof Map && ((Map<?, ?>) value).isEmpty()) return true;
+        return false;
     }
 
-    public Boolean getEmptyValueAsFail() {
-        return emptyValueAsFail;
-    }
-
-    public FailoverStrategy getFailoverStrategy() {
-        return failoverStrategy;
-    }
 }

@@ -2,8 +2,8 @@
   "groups": [
     {
       "name": "mybatis_inject",
-      "type": "com.quantchi.sqlinject.spring.MybatisSqlInjectProperties",
-      "sourceType": "com.quantchi.sqlinject.spring.MybatisSqlInjectProperties"
+      "type": "com.quantchi.sqlinject.spring.SqlInjectProperties",
+      "sourceType": "com.quantchi.sqlinject.spring.SqlInjectProperties"
     }
   ],
   "properties": [
@@ -16,15 +16,16 @@
     {
       "name": "mybatis.inject.emptyValueAsFail",
       "type": "java.lang.Boolean",
-      "sourceType": "com.quantchi.sqlinject.spring.MybatisSqlInjectProperties",
+      "sourceType": "com.quantchi.sqlinject.spring.SqlInjectProperties",
       "defaultValue": true,
       "description": "是否将计算值为empty/null/''等值作为失败"
     },
     {
       "name": "mybatis.inject.failoverStrategy",
       "type": "com.quantchi.sqlinject.annotation.FailoverStrategy",
-      "sourceType": "com.quantchi.sqlinject.spring.MybatisSqlInjectProperties",
-      "description": "注入失败时的处理策略"
+      "sourceType": "com.quantchi.sqlinject.spring.SqlInjectProperties",
+      "description": "注入失败时的处理策略",
+      "defaultValue": "throw"
     }
   ],
   "hints": []

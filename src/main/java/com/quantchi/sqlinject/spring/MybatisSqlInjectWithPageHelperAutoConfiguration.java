@@ -4,7 +4,6 @@ import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import com.quantchi.sqlinject.injector.SpringELHandler;
 import com.quantchi.sqlinject.mybatis.DataPrivilegeInterceptor;
-import org.apache.ibatis.plugin.Interceptor;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.support.AbstractBeanFactory;
@@ -25,7 +24,7 @@ import java.lang.reflect.Method;
 @Configuration
 @ConditionalOnBean(SqlSessionFactory.class)
 @ConditionalOnClass(PageHelper.class)
-@EnableConfigurationProperties({MybatisSqlInjectProperties.class})
+@EnableConfigurationProperties({SqlInjectProperties.class})
 @ConditionalOnProperty(name = "mybatis.inject.enabled", havingValue = "true", matchIfMissing = true)
 public class MybatisSqlInjectWithPageHelperAutoConfiguration {
 
@@ -36,8 +35,8 @@ public class MybatisSqlInjectWithPageHelperAutoConfiguration {
     @Bean
     @Primary
     @ConditionalOnMissingBean
-    public Interceptor dataPrivilegeInterceptor(SpringELHandler springELHandler,
-                                                MybatisSqlInjectProperties properties,
+    public DataPrivilegeInterceptor dataPrivilegeInterceptor(SpringELHandler springELHandler,
+                                                SqlInjectProperties properties,
                                                 Environment env) {
         DataPrivilegeInterceptor dataPrivilegeInterceptor = new DataPrivilegeInterceptor(springELHandler);
         dataPrivilegeInterceptor.setInterceptPageHelperCountMethod(true);
@@ -52,9 +51,8 @@ public class MybatisSqlInjectWithPageHelperAutoConfiguration {
     @Primary
     @ConditionalOnMissingBean
     public SpringELHandler springELHandler(AbstractBeanFactory beanFactory,
-                                           MybatisSqlInjectProperties properties) {
-        SpringELHandler springELHandler= new SpringELHandler(beanFactory, null);
-        springELHandler.setFailoverStrategy(properties.getFailoverStrategy());
+                                           SqlInjectProperties properties) {
+        SpringELHandler springELHandler= new SpringELHandler(beanFactory, null, properties);
         springELHandler.setPreHandler(()-> {
             tempPage.set(PageHelper.getLocalPage());
             PageHelper.clearPage();
@@ -62,18 +60,20 @@ public class MybatisSqlInjectWithPageHelperAutoConfiguration {
         springELHandler.setPostHandler(()-> {
             Page<?> page = tempPage.get();
             if (setLocalPageMethod == null) {
-                setLocalPageMethod = BeanUtils.findMethod(PageHelper.class, "setLocalPage", Page.class);
-                if (setLocalPageMethod == null ) {
-                    if (page != null) {
-                        if (page.getOrderBy() != null) {
-                            PageHelper.startPage(page.getPageNum(), page.getPageSize(), page.getOrderBy());
-                        } else {
-                            PageHelper.startPage(page.getPageNum(), page.getPageSize(), page.isCount(), page.getReasonable(), page.getPageSizeZero() );
+                synchronized (MybatisSqlInjectWithPageHelperAutoConfiguration.class) {
+                    setLocalPageMethod = BeanUtils.findMethod(PageHelper.class, "setLocalPage", Page.class);
+                    if (setLocalPageMethod == null ) {
+                        if (page != null) {
+                            if (page.getOrderBy() != null) {
+                                PageHelper.startPage(page.getPageNum(), page.getPageSize(), page.getOrderBy());
+                            } else {
+                                PageHelper.startPage(page.getPageNum(), page.getPageSize(), page.isCount(), page.getReasonable(), page.getPageSizeZero() );
+                            }
                         }
+                        return;
+                    } else {
+                        setLocalPageMethod.setAccessible(true);
                     }
-                    return;
-                } else {
-                    setLocalPageMethod.setAccessible(true);
                 }
             }
             try {

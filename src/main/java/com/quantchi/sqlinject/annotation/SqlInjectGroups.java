@@ -2,13 +2,16 @@ package com.quantchi.sqlinject.annotation;
 
 import java.lang.annotation.*;
 
+/**
+ * 暂未实现
+ */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface SqlParseInjectGroup {
+public @interface SqlInjectGroups {
 
-    Logic logic() default Logic.OR;
+    Logic logic() default Logic.AND;
 
-    SqlParseInject[] value();
+    SqlInjectGroup[] value();
 
 }

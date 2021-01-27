@@ -1,15 +1,14 @@
 package com.quantchi.sqlinject.injector;
 
-import com.quantchi.sqlinject.annotation.FailoverStrategy;
-import com.quantchi.sqlinject.annotation.SqlParseInject;
-import com.quantchi.sqlinject.exception.EmptyValueException;
+import com.quantchi.sqlinject.annotation.FilterMode;
 import com.quantchi.sqlinject.mysql.MysqlInject;
 import org.springframework.util.StringUtils;
 
 import java.util.Collection;
 import java.util.Optional;
+import java.util.stream.Stream;
 
-public class SqlParseInjector implements SqlInjector {
+public class SqlParseInjector implements ValueSqlInjector {
 
     private final String table;
 
@@ -19,31 +18,27 @@ public class SqlParseInjector implements SqlInjector {
 
     private final boolean not;
 
-    private final SqlParseInject.MODE mode;
+    private final FilterMode mode;
 
-    private final String[] values;
-
-    private final SpringELHandler springELHandler;
+    private final Object[] values;
 
     private final MysqlInject inject = new MysqlInject();
 
-    public SqlParseInjector(SpringELHandler springELHandler, String table, String field, boolean not, SqlParseInject.MODE mode, String[] filters) {
-        this.springELHandler = springELHandler;
+    public SqlParseInjector(String table, String field, boolean not, FilterMode mode, String[] filters) {
         this.table = StringUtils.isEmpty(table)?null:table;
         this.field = field;
         this.not = not;
         this.mode = mode;
-        this.values = filters == null? new String[0]: filters;
+        this.values = filters == null? new Object[0]: Stream.of(filters).toArray();
         this.filter = null;
     }
 
     public SqlParseInjector(String filter) {
-        this.springELHandler = null;
         this.filter = filter == null? "": filter;
         this.table = null;
         this.field = null;
         this.not = false;
-        this.mode = SqlParseInject.MODE.CUSTOM;
+        this.mode = FilterMode.CUSTOM;
         this.values = new String[0];
     }
 
@@ -51,17 +46,14 @@ public class SqlParseInjector implements SqlInjector {
         if (this.filter != null) {
             return this.filter;
         }
-        if (springELHandler == null) {
-            throw new IllegalStateException("不可能发生的");
-        }
         StringBuilder filterBuilder = new StringBuilder();
         switch (mode) {
             case EQUAL:
-                if (values.length > 1) {
-                    throw new IllegalStateException("EQUAL模式不支持多个参数");
+                if (values().length != 1) {
+                    throw new IllegalStateException("EQUAL模式仅能使用一个参数");
                 }
                 filterBuilder.append(wrapField());
-                Object value1 = springELHandler.handle(values[0]);
+                Object value1 = values()[0];
                 if ("null".equalsIgnoreCase(Optional.ofNullable(value1).map(Object::toString).map(String::trim).orElse(""))) {
                     filterBuilder.append(not?" IS NOT NULL ": " IS NULL");
                     break;
@@ -70,31 +62,29 @@ public class SqlParseInjector implements SqlInjector {
                 filterBuilder.append(checkAndWrapValue(value1));
                 break;
             case LIKE:
-                if (values.length > 1) {
-                    throw new IllegalStateException("EQUAL模式不支持多个参数");
+                if (values().length != 1) {
+                    throw new IllegalStateException("LIKE模式仅能使用一个参数");
                 }
                 filterBuilder.append(wrapField()).append(not?" NOT":" ").append(" LIKE");
-                Object value2 = springELHandler.handle(values[0]);
+                Object value2 = values()[0];
                 checkAndWrapValue(value2);
                 filterBuilder.append("'").append(value2).append("'");
                 break;
             case IN:
                 filterBuilder.append(wrapField()).append(not?" NOT":" ").append(" IN (");
-                if (values.length == 1) {
-                    Object value3 = springELHandler.handle(values[0]);
+                if (values().length == 1) {
+                    Object value3 = values()[0];
                     if (value3 instanceof Collection) {
                         for (Object v : (Collection<?>)value3) {
                             filterBuilder.append(checkAndWrapValue(v)).append(",");
                         }
                         filterBuilder.setCharAt(filterBuilder.length()-1, ')');
                     } else {
-                        checkAndWrapValue(value3);
-                        filterBuilder.append(value3).append(")");
+                        filterBuilder.append(checkAndWrapValue(value3)).append(")");
                     }
-                } else if (values.length > 1) {
-                    for (String value : values) {
-                        Object value3 = springELHandler.handle(value);
-                        filterBuilder.append(checkAndWrapValue(value3)).append(',');
+                } else if (values().length > 1) {
+                    for (Object value : values()) {
+                        filterBuilder.append(checkAndWrapValue(value)).append(',');
                     }
                     filterBuilder.setCharAt(filterBuilder.length()-1, ')');
                 } else {
@@ -103,28 +93,28 @@ public class SqlParseInjector implements SqlInjector {
                 break;
             case BETWEEN:
                 filterBuilder.append(wrapField()).append(not?" NOT":" ").append(" BETWEEN ");
-                if (values.length != 2) {
+                if (values().length != 2) {
                     throw new IllegalStateException("BETWEEN模式只支持两个参数");
                 }
-                Object value4 = springELHandler.handle(values[0]);
+                Object value4 = values()[0];
                 filterBuilder.append(checkAndWrapValue(value4)).append(" AND ");
-                value4 = springELHandler.handle(values[1]);
+                value4 = values()[1];
                 filterBuilder.append(checkAndWrapValue(value4));
                 break;
             case EXISTS:
                 filterBuilder.append(not?" NOT ":"").append(" EXISTS (");
-                if (values.length!= 1) {
-                    throw new IllegalStateException("EXISTS模式过滤必须存在一个参数");
+                if (values().length!= 1) {
+                    throw new IllegalStateException("EXISTS模式仅能使用一个参数");
                 }
-                Object value5 = springELHandler.handle(values[0]);
+                Object value5 = values()[0];
                 checkAndWrapValue(value5);
                 filterBuilder.append(value5).append(")");
                 break;
             case CUSTOM:
-                if (values.length!= 1) {
-                    throw new IllegalStateException("CUSTOM模式过滤必须存在一个参数");
+                if (values().length!= 1) {
+                    throw new IllegalStateException("CUSTOM模式仅能使用一个参数");
                 }
-                Object value6 = springELHandler.handle(values[0]);
+                Object value6 = values()[0];
                 checkAndWrapValue(value6);
                 filterBuilder.append(value6);
         }
@@ -145,23 +135,14 @@ public class SqlParseInjector implements SqlInjector {
     }
 
     private String parseSql(String sql) {
-        String filter = null;
-        try {
-            filter = evalFilter();
-            if (StringUtils.isEmpty(filter)) {
-                return sql;
-            }
-        } catch (Exception e) {
-            if (e instanceof EmptyValueException) {
-                if (springELHandler != null && FailoverStrategy.REJECT.equals(springELHandler.getFailoverStrategy())) {
-                    return inject.injectFilter(sql, null, "1 = 2");
-                }
-            }
-            throw e;
+        String filter = evalFilter();
+        if (StringUtils.isEmpty(filter)) {
+            return sql;
         }
         return inject.injectFilter(sql, table, filter);
     }
 
+    @Override
     public String inject(String sql) {
         return parseSql(sql);
     }
@@ -172,5 +153,10 @@ public class SqlParseInjector implements SqlInjector {
 
     public String getField() {
         return field;
+    }
+
+    @Override
+    public Object[] values() {
+        return this.values;
     }
 }

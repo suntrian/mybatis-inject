@@ -9,22 +9,12 @@ public @interface SqlParseInject {
 
     boolean not() default false;
 
-    MODE mode() default MODE.CUSTOM;
+    FilterMode mode() default FilterMode.CUSTOM;
 
     String table() default "";
 
     String field() default "";
 
     String[] filter();
-
-
-    enum MODE{
-        EQUAL,
-        IN,
-        EXISTS,
-        LIKE,
-        BETWEEN,
-        CUSTOM
-    }
 
 }
