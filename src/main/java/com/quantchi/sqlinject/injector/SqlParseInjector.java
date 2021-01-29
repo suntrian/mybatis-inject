@@ -84,18 +84,17 @@ public class SqlParseInjector implements ValueSqlInjector {
                         for (Object v : (Collection<?>)value3) {
                             filterBuilder.append(checkAndWrapValue(v)).append(",");
                         }
-                        filterBuilder.setCharAt(filterBuilder.length()-1, ')');
                     } else {
-                        filterBuilder.append(checkAndWrapValue(value3)).append(")");
+                        filterBuilder.append(checkAndWrapValue(value3)).append(",");
                     }
                 } else if (values().length > 1) {
                     for (Object value : values()) {
                         filterBuilder.append(checkAndWrapValue(value)).append(',');
                     }
-                    filterBuilder.setCharAt(filterBuilder.length()-1, ')');
                 } else {
                     throw new IllegalStateException("IN模式过滤必须存在参数");
                 }
+                filterBuilder.setCharAt(filterBuilder.length()-1, ')');
                 break;
             case BETWEEN:
                 filterBuilder.append(wrapField()).append(not?" NOT":" ").append(" BETWEEN ");
@@ -132,7 +131,7 @@ public class SqlParseInjector implements ValueSqlInjector {
     }
 
     private String checkAndWrapValue(Object value) {
-        if (value == null) throw new NullPointerException("注入参数计算值为空");
+        if (value == null) return  "NULL";
         if (value instanceof Number) {
             return "" + value;
         } else {

@@ -32,7 +32,8 @@ class HiveRewriteListener(private val rewriter: TokenStreamRewriter,
         val filters = getFilters(tableName, null)
         if (filters.isNotEmpty()) {
             if (ctx.whereClause() != null) {
-                rewriter.insertAfter(ctx.whereClause().KW_WHERE().symbol, " ${mergeFilters(filters)} AND ")
+                rewriter.insertAfter(ctx.whereClause().KW_WHERE().symbol, " ${mergeFilters(filters)} AND (")
+                rewriter.insertAfter(ctx.whereClause().stop, " )")
             } else {
                 rewriter.insertAfter(ctx.tableName().stop, " WHERE ${mergeFilters(filters)} ")
             }
@@ -44,7 +45,8 @@ class HiveRewriteListener(private val rewriter: TokenStreamRewriter,
         val filters = getFilters(tableName, null)
         if (filters.isNotEmpty()) {
             if (ctx.whereClause() != null) {
-                rewriter.insertAfter(ctx.whereClause().KW_WHERE().symbol, " ${mergeFilters(filters)} AND ")
+                rewriter.insertAfter(ctx.whereClause().KW_WHERE().symbol, " ${mergeFilters(filters)} AND (")
+                rewriter.insertAfter(ctx.whereClause().stop, " )")
             } else {
                 rewriter.insertAfter(ctx.setColumnsClause().stop, " WHERE ${mergeFilters(filters)} ")
             }
@@ -56,7 +58,8 @@ class HiveRewriteListener(private val rewriter: TokenStreamRewriter,
         if (filters.isNotEmpty()) {
             for (bodyContext in ctx.body()) {
                 if (bodyContext.whereClause() != null) {
-                    rewriter.insertAfter(bodyContext.whereClause().KW_WHERE().symbol, " ${mergeFilters(filters)} AND ")
+                    rewriter.insertAfter(bodyContext.whereClause().KW_WHERE().symbol, " ${mergeFilters(filters)} AND (")
+                    rewriter.insertAfter(bodyContext.whereClause().stop, " )")
                 } else {
                     if (bodyContext.lateralView() != null) {
                         rewriter.insertAfter(bodyContext.lateralView().stop, " WHERE ${mergeFilters(filters)} ")
@@ -73,7 +76,8 @@ class HiveRewriteListener(private val rewriter: TokenStreamRewriter,
             val filters = getFilters(ctx.fromClause().fromSource())
             if (filters.isNotEmpty()) {
                 if (ctx.whereClause() != null) {
-                    rewriter.insertAfter(ctx.whereClause().KW_WHERE().symbol, " ${mergeFilters(filters)} AND ")
+                    rewriter.insertAfter(ctx.whereClause().KW_WHERE().symbol, " ${mergeFilters(filters)} AND (")
+                    rewriter.insertAfter(ctx.whereClause().stop, " )")
                 } else {
                     rewriter.insertAfter(ctx.fromClause().stop, " WHERE ${mergeFilters(filters)} ")
                 }
@@ -82,7 +86,8 @@ class HiveRewriteListener(private val rewriter: TokenStreamRewriter,
             val filters = this.tableFilters[null]?: this.tableFilters[""]?: emptyList()
             if (filters.isNotEmpty()) {
                 if (ctx.whereClause() != null) {
-                    rewriter.insertAfter(ctx.whereClause().KW_WHERE().symbol, " ${mergeFilters(filters)} AND ")
+                    rewriter.insertAfter(ctx.whereClause().KW_WHERE().symbol, " ${mergeFilters(filters)} AND (")
+                    rewriter.insertAfter(ctx.whereClause().stop, " )")
                 } else {
                     rewriter.insertAfter(ctx.selectClause().stop, " WHERE ${mergeFilters(filters)} ")
                 }

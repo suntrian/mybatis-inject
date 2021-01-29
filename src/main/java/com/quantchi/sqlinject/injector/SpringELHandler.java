@@ -1,6 +1,6 @@
 package com.quantchi.sqlinject.injector;
 
-import com.quantchi.sqlinject.annotation.FailoverStrategy;
+import com.quantchi.sqlinject.annotation.TreatBlankStrategy;
 import com.quantchi.sqlinject.exception.EmptyValueException;
 import com.quantchi.sqlinject.exception.ValueEvalException;
 import com.quantchi.sqlinject.spring.SqlInjectProperties;
@@ -56,14 +56,11 @@ public class SpringELHandler {
                 this.preHandler.run();
             }
             Object evaluate = this.beanExpressionResolver.evaluate(expression, this.beanExpressionContext);
-            if (sqlInjectProperties.getEmptyValueAsFail() && isEmptyValue(evaluate)) {
-                throw new EmptyValueException(evaluate);
+            if (!TreatBlankStrategy.ACCEPT.equals(sqlInjectProperties.getTreatBlankStrategy()) && isEmptyValue(evaluate)) {
+                throw new EmptyValueException(expression, evaluate);
             }
             return evaluate;
         } catch (Exception e) {
-            if (FailoverStrategy.IGNORE.equals(sqlInjectProperties.getFailoverStrategy())){
-                return null;
-            }
             throw new ValueEvalException(e);
         } finally {
             if (this.postHandler != null) {

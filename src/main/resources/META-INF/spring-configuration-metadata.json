@@ -14,11 +14,11 @@
       "description": "是否启用"
     },
     {
-      "name": "mybatis.inject.emptyValueAsFail",
-      "type": "java.lang.Boolean",
+      "name": "mybatis.inject.treatBlankStrategy",
+      "type": "com.quantchi.sqlinject.annotation.TreatBlankStrategy",
       "sourceType": "com.quantchi.sqlinject.spring.SqlInjectProperties",
-      "defaultValue": true,
-      "description": "是否将计算值为empty/null/''等值作为失败"
+      "defaultValue": "reject",
+      "description": "注入值为empty/null/''等值的处理策略"
     },
     {
       "name": "mybatis.inject.failoverStrategy",

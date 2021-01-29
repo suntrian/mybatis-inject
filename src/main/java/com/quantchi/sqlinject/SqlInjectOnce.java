@@ -1,7 +1,10 @@
 package com.quantchi.sqlinject;
 
 import com.quantchi.sqlinject.annotation.FailoverStrategy;
+import com.quantchi.sqlinject.annotation.TreatBlankStrategy;
 import com.quantchi.sqlinject.injector.SqlInjector;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class SqlInjectOnce {
 
@@ -11,35 +14,28 @@ public class SqlInjectOnce {
 
     private FailoverStrategy failoverStrategy;
 
+    private TreatBlankStrategy treatBlankStrategy;
+
     private SqlInjector sqlInjector;
 
-    private boolean stay = false;
+    private final AtomicInteger stay = new AtomicInteger(0);
 
     private SqlInjectOnce() {}
 
     public static SqlInjectOnce enabled(boolean enabled) {
-        if (config.get() == null) {
-            config.set(new SqlInjectOnce());
-        }
-        SqlInjectOnce conf = config.get();
+        SqlInjectOnce conf = getSqlInjectConf();
         conf.enabled = enabled;
         return conf;
     }
 
     public static SqlInjectOnce failoverStrategy(FailoverStrategy strategy) {
-        if (config.get() == null) {
-            config.set(new SqlInjectOnce());
-        }
-        SqlInjectOnce conf = config.get();
+        SqlInjectOnce conf = getSqlInjectConf();
         conf.failoverStrategy = strategy;
         return conf;
     }
 
     public static SqlInjectOnce temporaryInject(SqlInjector sqlInjector) {
-        if (config.get() == null) {
-            config.set(new SqlInjectOnce());
-        }
-        SqlInjectOnce conf = config.get();
+        SqlInjectOnce conf = getSqlInjectConf();
         conf.sqlInjector = sqlInjector;
         return conf;
     }
@@ -52,12 +48,28 @@ public class SqlInjectOnce {
         return config.get() == null? null : config.get().failoverStrategy;
     }
 
+    public static TreatBlankStrategy treatBlankStrategy() {
+        return config.get() == null? null : config.get().treatBlankStrategy;
+    }
+
+    public static SqlInjectOnce treatBlankStrategy(TreatBlankStrategy treatBlankStrategy) {
+        SqlInjectOnce conf = getSqlInjectConf();
+        conf.treatBlankStrategy = treatBlankStrategy;
+        return conf;
+    }
+
     public static SqlInjectOnce stay() {
-        if (config.get() == null) {
-            config.set(new SqlInjectOnce());
-        }
-        SqlInjectOnce conf = config.get();
-        conf.stay = true;
+        return stay(1);
+    }
+
+    /**
+     * 保留配置多少次SQL执行本执行配置不清理，谨慎使用，在线程池场景下，单次执行配置不清理可能导致数据泄漏到一下次无关的SQL执行
+     * @param times 当前线程中，不执行清理的SQL执行次数
+     * @return SqlInjectOnce
+     */
+    public static SqlInjectOnce stay(int times) {
+        SqlInjectOnce conf = getSqlInjectConf();
+        conf.stay.addAndGet(times);
         return conf;
     }
 
@@ -67,11 +79,16 @@ public class SqlInjectOnce {
 
     public static void clear() {
         if (config.get() != null) {
-            if (!config.get().stay) {
+            if (config.get().stay.decrementAndGet() < 0) {
                 config.remove();
-            } else {
-                config.get().stay = false;
             }
         }
+    }
+
+    private static SqlInjectOnce getSqlInjectConf() {
+        if (config.get() == null) {
+            config.set(new SqlInjectOnce());
+        }
+        return config.get();
     }
 }

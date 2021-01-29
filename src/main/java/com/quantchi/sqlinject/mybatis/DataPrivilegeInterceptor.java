@@ -2,6 +2,7 @@ package com.quantchi.sqlinject.mybatis;
 
 import com.quantchi.sqlinject.SqlInjectOnce;
 import com.quantchi.sqlinject.annotation.*;
+import com.quantchi.sqlinject.exception.EmptyValueException;
 import com.quantchi.sqlinject.injector.*;
 import org.apache.ibatis.executor.statement.StatementHandler;
 import org.apache.ibatis.mapping.BoundSql;
@@ -15,7 +16,10 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -97,8 +101,22 @@ public class DataPrivilegeInterceptor implements Interceptor {
             for (SqlInjector sqlInjector : sqlInjectors) {
                 try {
                     sql = sqlInjector.inject(sql);
+                } catch (EmptyValueException e) {
+                    TreatBlankStrategy treatBlankStrategy = springELHandler.getSqlInjectProperties().getTreatBlankStrategy();
+                    switch (treatBlankStrategy) {
+                        case THROW:
+                            throw e;
+                        case REJECT:
+                            sql = getRejectSqlInjector(guessDialect(sqlInjectors)).inject(sql);
+                            break;
+                        case IGNORE:
+                            //使用原SQL，do nothing
+                        case ACCEPT:
+                        default:
+                            // do nothing
+                    }
                 } catch (Exception e) {
-                    FailoverStrategy failoverStrategy = Optional.ofNullable(SqlInjectOnce.failoverStrategy()).orElseGet(()->springELHandler.getSqlInjectProperties().getFailoverStrategy());
+                    FailoverStrategy failoverStrategy = springELHandler.getSqlInjectProperties().getFailoverStrategy();
                     if (FailoverStrategy.THROW == failoverStrategy) {
                         throw e;
                     } else if (FailoverStrategy.REJECT == failoverStrategy) {

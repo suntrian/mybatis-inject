@@ -32,7 +32,8 @@ class MysqlRewriteListener(private val rewriter: TokenStreamRewriter,
             if (ctx.WHERE() == null) {
                 rewriter.insertAfter(ctx.tableSources().stop, " WHERE ${mergeFilters(filters)}")
             } else {
-                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND " )
+                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND ( " )
+                rewriter.insertAfter(ctx.whereExpr.stop, " )")
             }
         }
     }
@@ -45,7 +46,8 @@ class MysqlRewriteListener(private val rewriter: TokenStreamRewriter,
             if (ctx.WHERE() == null) {
                 rewriter.insertAfter(ctx.updatedElement().last().stop, " WHERE ${mergeFilters(filters)}")
             } else {
-                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND ")
+                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND (")
+                rewriter.insertAfter(ctx.expression().stop, " )")
             }
         }
     }
@@ -56,7 +58,8 @@ class MysqlRewriteListener(private val rewriter: TokenStreamRewriter,
             if (ctx.WHERE() == null) {
                 rewriter.insertAfter(ctx.updatedElement().last().stop, " WHERE ${mergeFilters(filters)}")
             } else {
-                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND ")
+                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND (")
+                rewriter.insertAfter(ctx.expression().stop, " )")
             }
         }
     }
@@ -72,7 +75,8 @@ class MysqlRewriteListener(private val rewriter: TokenStreamRewriter,
                     rewriter.insertAfter(ctx.tableName().stop, " WHERE ${mergeFilters(filters)}")
                 }
             } else {
-                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND ")
+                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND (")
+                rewriter.insertAfter(ctx.expression().stop, " )")
             }
         }
     }
@@ -83,7 +87,8 @@ class MysqlRewriteListener(private val rewriter: TokenStreamRewriter,
             if (ctx.WHERE() == null) {
                 rewriter.insertAfter(ctx.tableSources().stop, " WHERE ${mergeFilters(filters)}")
             } else {
-                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND ")
+                rewriter.insertAfter(ctx.WHERE().symbol, " ${mergeFilters(filters)} AND (")
+                rewriter.insertAfter(ctx.expression().stop, " )")
             }
         }
     }

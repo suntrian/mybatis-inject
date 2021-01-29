@@ -1,9 +1,13 @@
 package com.quantchi.sqlinject.spring;
 
 
+import com.quantchi.sqlinject.SqlInjectOnce;
 import com.quantchi.sqlinject.annotation.Dialect;
 import com.quantchi.sqlinject.annotation.FailoverStrategy;
+import com.quantchi.sqlinject.annotation.TreatBlankStrategy;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+
+import java.util.Optional;
 
 @ConfigurationProperties(prefix = "mybatis.inject")
 public class SqlInjectProperties {
@@ -13,7 +17,7 @@ public class SqlInjectProperties {
     private FailoverStrategy failoverStrategy = FailoverStrategy.THROW;
 
     //过滤条件的值为空或者null或者""之类的值时认为是错误
-    private Boolean emptyValueAsFail = true;
+    private TreatBlankStrategy treatBlankStrategy = TreatBlankStrategy.REJECT;
 
     private Dialect dialect = Dialect.MYSQL;
 
@@ -21,16 +25,16 @@ public class SqlInjectProperties {
         this.failoverStrategy = failoverStrategy;
     }
 
-    public void setEmptyValueAsFail(Boolean emptyValueAsFail) {
-        this.emptyValueAsFail = emptyValueAsFail;
-    }
-
     public FailoverStrategy getFailoverStrategy() {
-        return failoverStrategy;
+        return Optional.ofNullable(SqlInjectOnce.failoverStrategy()).orElse(failoverStrategy);
     }
 
-    public Boolean getEmptyValueAsFail() {
-        return emptyValueAsFail;
+    public TreatBlankStrategy getTreatBlankStrategy() {
+        return Optional.ofNullable(SqlInjectOnce.treatBlankStrategy()).orElse(treatBlankStrategy);
+    }
+
+    public void setTreatBlankStrategy(TreatBlankStrategy treatBlankStrategy) {
+        this.treatBlankStrategy = treatBlankStrategy;
     }
 
     public Boolean getEnabled() {
