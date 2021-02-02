@@ -16,10 +16,7 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -200,13 +197,15 @@ public class DataPrivilegeInterceptor implements Interceptor {
                 SqlInjectGroup sqlInjectGroup = method.getAnnotation(SqlInjectGroup.class);
                 if (sqlInjectGroup != null) {
                     Logic logic = sqlInjectGroup.logic();
+                    Set<Dialect> dialects = new HashSet<>(4, 1.00f);
                     List<SqlInjector> sqlParseInjectors = Stream.concat(Stream.of(sqlInjectGroup.value()), Stream.of(sqlInjectGroup.parseInject()))
                             .map(it->{
+                                dialects.add(it.dialect());
                                 SqlParseInjector sqlParseInjector = new SqlParseInjector(it.table(), it.field(), it.not(), it.mode(), it.filter(), it.dialect());
                                 return new SpringELValueInjector(this.springELHandler, sqlParseInjector);
                             })
                             .collect(Collectors.toList());
-                    if (sqlParseInjectors.size()>1 && sqlParseInjectors.stream().map(it->((SqlParseInjector)it).getDialect()).distinct().count()>1) {
+                    if (dialects.size() >1 ) {
                         throw new IllegalStateException("同一注解中不可使用多个SQL方言");
                     }
                     List<SqlInjector> placeholderInjectors = Stream.of(sqlInjectGroup.placeholderInject())

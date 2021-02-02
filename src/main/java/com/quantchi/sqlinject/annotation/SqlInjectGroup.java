@@ -13,11 +13,11 @@ public @interface SqlInjectGroup {
     Logic logic() default Logic.OR;
 
     @AliasFor("parseInject")
-    SqlParseInject[] value();
+    SqlParseInject[] value() default {};
 
     @AliasFor("value")
-    SqlParseInject[] parseInject();
+    SqlParseInject[] parseInject() default {};
 
-    PlaceholderInject[] placeholderInject();
+    PlaceholderInject[] placeholderInject() default {};
 
 }
